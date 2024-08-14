@@ -47,15 +47,17 @@ under the License.
         <module>flink-sql-connector-kafka</module>
         <module>flink-connector-kafka-e2e-tests</module>
         <module>flink-python</module>
+        <module>flink-kafka-formats-apicurio</module>
     </modules>
 
     <properties>
-        <flink.version>1.17.0</flink.version>
+        <flink.version>1.19.0</flink.version>
         <kafka.version>3.4.0</kafka.version>
         <zookeeper.version>3.7.2</zookeeper.version>
         <confluent.version>7.4.4</confluent.version>
 
         <jackson-bom.version>2.15.2</jackson-bom.version>
+        <flink.shaded.jackson.version>2.14.2</flink.shaded.jackson.version>
         <junit4.version>4.13.2</junit4.version>
         <junit5.version>5.9.1</junit5.version>
         <assertj.version>3.23.1</assertj.version>
@@ -93,20 +95,24 @@ under the License.
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-core</artifactId>
+            <version>${flink.shaded.jackson.version}</version>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
+            <version>${flink.shaded.jackson.version}</version>
         </dependency>
         <dependency>
             <!--	Java 8 Date/time	-->
             <groupId>com.fasterxml.jackson.datatype</groupId>
             <artifactId>jackson-datatype-jsr310</artifactId>
+            <version>${flink.shaded.jackson.version}</version>
         </dependency>
         <dependency>
             <!--	Java 8 Datatypes	-->
             <groupId>com.fasterxml.jackson.datatype</groupId>
             <artifactId>jackson-datatype-jdk8</artifactId>
+            <version>${flink.shaded.jackson.version}</version>
         </dependency>
 
         <!-- Logging API -->
@@ -424,14 +430,7 @@ under the License.
             <dependency>
                 <groupId>org.apache.commons</groupId>
                 <artifactId>commons-compress</artifactId>
-                <version>1.26.1</version>
-            </dependency>
-
-            <!-- For dependency convergence -->
-            <dependency>
-                <groupId>commons-io</groupId>
-                <artifactId>commons-io</artifactId>
-                <version>2.15.1</version>
+                <version>1.25.0</version>
             </dependency>
 
             <dependency>

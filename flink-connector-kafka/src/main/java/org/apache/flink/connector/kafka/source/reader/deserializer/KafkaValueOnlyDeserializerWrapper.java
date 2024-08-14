@@ -88,7 +88,8 @@ class KafkaValueOnlyDeserializerWrapper<T> implements KafkaRecordDeserialization
                             + "invoked.");
         }
 
-        T value = deserializer.deserialize(record.topic(), record.value());
+        T value = deserializer.deserialize(record.topic(), getValueDeserializationPayload(record));
+
         LOG.trace(
                 "Deserialized [partition: {}-{}, offset: {}, timestamp: {}, value: {}]",
                 record.topic(),
@@ -97,6 +98,10 @@ class KafkaValueOnlyDeserializerWrapper<T> implements KafkaRecordDeserialization
                 record.timestamp(),
                 value);
         collector.collect(value);
+    }
+
+    protected byte[] getValueDeserializationPayload(ConsumerRecord<byte[], byte[]> record) throws IOException {
+        return record.value();
     }
 
     @Override
