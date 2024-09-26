@@ -1,0 +1,19 @@
+{
+  "type": "record",
+  "name": "demoschema",
+  "fields": [
+    {
+      "name": "ip",
+      "type": "string"
+    },
+    {
+      "name": "type",
+      "type": "int"
+    },
+    {
+      "name": "age",
+      "type": "int",
+      "default": -1
+    }
+  ]
+}

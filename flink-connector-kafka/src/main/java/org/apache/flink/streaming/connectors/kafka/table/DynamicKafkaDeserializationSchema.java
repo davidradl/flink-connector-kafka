@@ -22,6 +22,10 @@ import org.apache.flink.api.common.serialization.DeserializationSchema;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.streaming.connectors.kafka.KafkaDeserializationSchema;
 import org.apache.flink.streaming.connectors.kafka.KafkaSerializationSchema;
+import org.apache.flink.streaming.connectors.kafka.table.deserdiscovery.KafkaFactoryUtil;
+import org.apache.flink.streaming.connectors.kafka.table.deserdiscovery.deserialization.DefaultRecordBasedDeserializationFactory;
+import org.apache.flink.streaming.connectors.kafka.table.deserdiscovery.deserialization.RecordBasedDeserialization;
+import org.apache.flink.streaming.connectors.kafka.table.deserdiscovery.deserialization.RecordBasedDeserializationFactory;
 import org.apache.flink.table.data.GenericRowData;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.types.DeserializationException;
@@ -33,12 +37,16 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 
 import javax.annotation.Nullable;
 
+import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
-/** A specific {@link KafkaSerializationSchema} for {@link KafkaDynamicSource}. */
-class DynamicKafkaDeserializationSchema implements KafkaDeserializationSchema<RowData> {
+/**
+ * Dynamic Kafka Deserialization Schema. A specific {@link KafkaSerializationSchema} for {@link
+ * KafkaDynamicSource}.
+ */
+public class DynamicKafkaDeserializationSchema implements KafkaDeserializationSchema<RowData> {
 
     private static final long serialVersionUID = 1L;
 
@@ -56,7 +64,7 @@ class DynamicKafkaDeserializationSchema implements KafkaDeserializationSchema<Ro
 
     private final boolean upsertMode;
 
-    DynamicKafkaDeserializationSchema(
+    protected DynamicKafkaDeserializationSchema(
             int physicalArity,
             @Nullable DeserializationSchema<RowData> keyDeserialization,
             int[] keyProjection,
@@ -110,26 +118,63 @@ class DynamicKafkaDeserializationSchema implements KafkaDeserializationSchema<Ro
         // shortcut in case no output projection is required,
         // also not for a cartesian product with the keys
         if (keyDeserialization == null && !hasMetadata) {
-            valueDeserialization.deserialize(record.value(), collector);
+            valueDeserialization.deserialize(getPayloadForValue(record), collector);
             return;
         }
 
         // buffer key(s)
         if (keyDeserialization != null) {
-            keyDeserialization.deserialize(record.key(), keyCollector);
+            keyDeserialization.deserialize(getPayloadForKey(record), keyCollector);
         }
 
         // project output while emitting values
         outputCollector.inputRecord = record;
         outputCollector.physicalKeyRows = keyCollector.buffer;
         outputCollector.outputCollector = collector;
-        if (record.value() == null && upsertMode) {
+        if (getPayloadForValue(record) == null && upsertMode) {
             // collect tombstone messages in upsert mode by hand
             outputCollector.collect(null);
         } else {
-            valueDeserialization.deserialize(record.value(), outputCollector);
+            valueDeserialization.deserialize(getPayloadForValue(record), outputCollector);
         }
         keyCollector.buffer.clear();
+    }
+
+    /**
+     * Get the Kafka payload for a key. By default this will be the key, but if we can find a
+     * RecordBasedDeserialization with identifier RECORD, then that class will specify the payload
+     *
+     * @param record
+     * @return the appropriate Kafka payload
+     * @throws IOException IO exception occurred
+     */
+    private byte[] getPayloadForKey(ConsumerRecord<byte[], byte[]> record) throws IOException {
+        RecordBasedDeserialization recordBasedDeserialization =
+                getRecordBasedDeserializationFactory(record);
+        return recordBasedDeserialization.getSerializedKeyFromConsumerRecord(record);
+    }
+
+    /**
+     * Get the Kafka payload for a value. By default this will be the value, but if we can find a
+     * RecordBasedDeserialization with identifier RECORD, then that class will specify the payload
+     *
+     * @param record
+     * @return the appropriate Kafka payload
+     * @throws IOException IO exception occurred
+     */
+    private byte[] getPayloadForValue(ConsumerRecord<byte[], byte[]> record) throws IOException {
+        RecordBasedDeserialization recordBasedDeserialization =
+                getRecordBasedDeserializationFactory(record);
+        return recordBasedDeserialization.getSerializedValueFromConsumerRecord(record);
+    }
+
+    private static RecordBasedDeserialization getRecordBasedDeserializationFactory(
+            ConsumerRecord<byte[], byte[]> record) {
+        return KafkaFactoryUtil.loadAndInvokeFactoryWithConsumerRecord(
+                RecordBasedDeserializationFactory.class,
+                RecordBasedDeserializationFactory::create,
+                DefaultRecordBasedDeserializationFactory::new,
+                record);
     }
 
     @Override
@@ -139,7 +184,8 @@ class DynamicKafkaDeserializationSchema implements KafkaDeserializationSchema<Ro
 
     // --------------------------------------------------------------------------------------------
 
-    interface MetadataConverter extends Serializable {
+    /** Metadata converter. Convert the Consumer Record to metadata. */
+    protected interface MetadataConverter extends Serializable {
         Object read(ConsumerRecord<?, ?> record);
     }
 
