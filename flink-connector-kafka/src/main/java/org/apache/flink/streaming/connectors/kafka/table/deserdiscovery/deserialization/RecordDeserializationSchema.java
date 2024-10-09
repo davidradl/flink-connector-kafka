@@ -18,26 +18,12 @@
 
 package org.apache.flink.streaming.connectors.kafka.table.deserdiscovery.deserialization;
 
+import org.apache.flink.table.connector.format.Format;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 
-import java.io.IOException;
-
 /** Indicates this is record based deserialization. */
-public class DefaultRecordBasedDeserialization implements RecordBasedDeserialization {
-    @Override
-    public byte[] getSerializedKeyFromConsumerRecord(ConsumerRecord<byte[], byte[]> record)
-            throws IOException {
-        return record.key();
-    }
+public interface RecordDeserializationFormat<I> extends Format {
+    boolean isKeyFlag();
 
-    @Override
-    public byte[] getSerializedValueFromConsumerRecord(ConsumerRecord<byte[], byte[]> record)
-            throws IOException {
-        return record.value();
-    }
-
-    @Override
-    public boolean canProcess(ConsumerRecord<byte[], byte[]> record) {
-        return false; // this should not be driven as this class is not a service loader.
-    }
+    byte[] getBytesForFormat(ConsumerRecord<byte[], byte[]> record);
 }

@@ -18,10 +18,34 @@
 
 package org.apache.flink.streaming.connectors.kafka.table.deserdiscovery.deserialization;
 
-/**
- * Record based Deserialization Factory. Implementations can access the ConsumerRecord including
- * Kafka headers.
- */
-public interface RecordBasedDeserializationFactory {
-    RecordBasedDeserialization create();
+import org.apache.flink.table.connector.ChangelogMode;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+
+/** Indicates this is record based deserialization. */
+public class DefaultRecordDeserializationFormat implements RecordDeserializationFormat {
+
+    private final boolean isKeyFlag;
+
+    DefaultRecordDeserializationFormat(boolean isKeyFlag) {
+        this.isKeyFlag = isKeyFlag;
+    }
+
+    @Override
+    public boolean isKeyFlag() {
+        return isKeyFlag;
+    }
+
+    @Override
+    public byte[] getBytesForFormat(ConsumerRecord<byte[], byte[]> record) {
+        if (isKeyFlag()) {
+            return record.key();
+        } else {
+            return record.value();
+        }
+    }
+
+    @Override
+    public ChangelogMode getChangelogMode() {
+        return null;
+    }
 }

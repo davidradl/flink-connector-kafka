@@ -18,11 +18,29 @@
 
 package org.apache.flink.streaming.connectors.kafka.table.deserdiscovery.serialization;
 
-/** Default RecordBased Serialization Factory. */
-public class DefaultRecordBasedSerializationFactory implements RecordBasedSerializationFactory {
+import org.apache.kafka.clients.producer.ProducerRecord;
+
+import java.io.IOException;
+
+/** Indicates this is record based Serialization. */
+public class DefaultRecordBasedSerialization implements RecordBasedSerialization {
+    private final boolean isKeyFlag;
+
+    DefaultRecordBasedSerialization(boolean isKeyFlag) {
+        this.isKeyFlag = isKeyFlag;
+    }
 
     @Override
-    public RecordBasedSerialization create() {
-        return new DefaultRecordBasedSerialization();
+    boolean isKeyFlag() {
+        return isKeyFlag;
+    }
+
+    @Override
+    byte[] getBytesForFormat(ProducerRecord<byte[], byte[]> record) throws IOException {
+        if (isKeyFlag()) {
+            return record.key();
+        } else {
+            return record.value();
+        }
     }
 }

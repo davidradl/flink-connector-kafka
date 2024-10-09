@@ -16,19 +16,13 @@
  * limitations under the License.
  */
 
-package org.apache.flink.streaming.connectors.kafka.table.deserdiscovery.deserialization;
+package org.apache.flink.streaming.connectors.kafka.table.deserdiscovery.serialization;
 
-import org.apache.kafka.clients.consumer.ConsumerRecord;
+/** Default RecordBased Serialization Factory. */
+public class DefaultRecordBasedFormatSerializationFactory implements RecordBasedFormatSerializationFactory {
 
-import java.io.IOException;
-
-/** Indicates this is record based deserialization. */
-public interface RecordBasedDeserialization {
-    byte[] getSerializedKeyFromConsumerRecord(ConsumerRecord<byte[], byte[]> record)
-            throws IOException;
-
-    byte[] getSerializedValueFromConsumerRecord(ConsumerRecord<byte[], byte[]> record)
-            throws IOException;
-
-    boolean canProcess(ConsumerRecord<byte[], byte[]> record) throws IOException;
+    @Override
+    public RecordBasedFormatSerialization create(boolean isKey) {
+        return new DefaultRecordBasedFormatSerialization(isKey);
+    }
 }

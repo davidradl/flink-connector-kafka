@@ -16,9 +16,17 @@
  * limitations under the License.
  */
 
-package org.apache.flink.streaming.connectors.kafka.table;
+package org.apache.flink.streaming.connectors.kafka.table.deserdiscovery.serialization;
 
-import org.apache.flink.table.factories.DeserializationFormatFactory;
+import org.apache.kafka.clients.producer.ProducerRecord;
 
-/** Kafka record deserialization format factory. */
-public interface KafkaRecordDeserializationFormatFactory extends DeserializationFormatFactory {}
+/**
+ * This interface extracts the payload, key headers and value headers from the record based
+ * serialization.
+ */
+public interface RecordBasedFormatSerialization {
+
+    boolean isKey();
+
+    byte[] getBytesForFormat(ProducerRecord<byte[], byte[]> record);
+}

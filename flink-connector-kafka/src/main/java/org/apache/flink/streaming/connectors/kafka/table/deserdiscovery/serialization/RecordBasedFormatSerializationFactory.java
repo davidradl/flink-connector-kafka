@@ -18,19 +18,7 @@
 
 package org.apache.flink.streaming.connectors.kafka.table.deserdiscovery.serialization;
 
-import org.apache.kafka.common.header.Headers;
-
-/**
- * This interface extracts the payload, key headers and value headers from the record based
- * serialization.
- */
-public interface RecordBasedSerialization {
-
-    byte[] getPayload(byte[] customSerialisation);
-
-    Headers getKeyHeaders(byte[] customSerialisation);
-
-    Headers getValueHeaders(byte[] customSerialisation);
-
-    boolean canProcess(byte[] customSerialisation);
+/** Record based Serialization Factory. */
+public interface RecordBasedFormatSerializationFactory {
+    RecordBasedFormatSerialization create(boolean isKey);
 }
