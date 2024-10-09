@@ -19,7 +19,8 @@
 package org.apache.flink.streaming.connectors.kafka.table.deserdiscovery.serialization;
 
 /** Default RecordBased Serialization Factory. */
-public class DefaultRecordBasedFormatSerializationFactory implements RecordBasedFormatSerializationFactory {
+public class DefaultRecordBasedFormatSerializationFactory
+        implements RecordBasedFormatSerializationFactory {
 
     @Override
     public RecordBasedFormatSerialization create(boolean isKey) {

@@ -26,7 +26,7 @@ import org.apache.kafka.clients.producer.ProducerRecord;
  */
 public interface RecordBasedFormatSerialization {
 
-    boolean isKey();
+    boolean isKeyFlag();
 
     byte[] getBytesForFormat(ProducerRecord<byte[], byte[]> record);
 }

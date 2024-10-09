@@ -47,6 +47,13 @@ public class AvroApicurioFormatOptions {
                                     + "Instructs the serializer to write the specified ID to Kafka,\n"
                                     + "and instructs the deserializer to use this ID to find the schema.");
 
+    public static final ConfigOption<String> FORMAT_NAME =
+            ConfigOptions.key("format-name")
+                    .stringType()
+                    .defaultValue(ApicurioRegistryAvroFormatFactory.IDENTIFIER)
+                    .withDescription(
+                            "The name of this format.");
+
     public static final ConfigOption<Boolean> REGISTER_SCHEMA =
             ConfigOptions.key("register-schema")
                     .booleanType()

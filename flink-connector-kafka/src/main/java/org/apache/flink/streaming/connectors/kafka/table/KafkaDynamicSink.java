@@ -29,6 +29,7 @@ import org.apache.flink.connector.kafka.sink.KafkaSinkBuilder;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.DataStreamSink;
 import org.apache.flink.streaming.connectors.kafka.partitioner.FlinkKafkaPartitioner;
+import org.apache.flink.streaming.connectors.kafka.table.deserdiscovery.serialization.RecordBasedFormatSerialization;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.connector.ChangelogMode;
 import org.apache.flink.table.connector.Projection;
@@ -46,6 +47,7 @@ import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.utils.DataTypeUtils;
 
 import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.header.Header;
 
 import javax.annotation.Nullable;
@@ -58,6 +60,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Properties;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -69,6 +72,8 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
 public class KafkaDynamicSink implements DynamicTableSink, SupportsWritingMetadata {
 
     private static final String UPSERT_KAFKA_TRANSFORMATION = "upsert-kafka";
+    private final Optional<RecordBasedFormatSerialization> keyRecordSerialization;
+    private final RecordBasedFormatSerialization valueRecordSerialization;
 
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
@@ -146,6 +151,8 @@ public class KafkaDynamicSink implements DynamicTableSink, SupportsWritingMetada
             EncodingFormat<SerializationSchema<RowData>> valueEncodingFormat,
             int[] keyProjection,
             int[] valueProjection,
+            @Nullable Optional<RecordBasedFormatSerialization> keyRecordSerialization,
+            RecordBasedFormatSerialization valueRecordSerialization,
             @Nullable String keyPrefix,
             @Nullable List<String> topics,
             @Nullable Pattern topicPattern,
@@ -166,6 +173,8 @@ public class KafkaDynamicSink implements DynamicTableSink, SupportsWritingMetada
                 checkNotNull(valueEncodingFormat, "Value encoding format must not be null.");
         this.keyProjection = checkNotNull(keyProjection, "Key projection must not be null.");
         this.valueProjection = checkNotNull(valueProjection, "Value projection must not be null.");
+        this.keyRecordSerialization = keyRecordSerialization;
+        this.valueRecordSerialization = valueRecordSerialization;
         this.keyPrefix = keyPrefix;
         this.transactionalIdPrefix = transactionalIdPrefix;
         // Mutable attributes
@@ -217,11 +226,22 @@ public class KafkaDynamicSink implements DynamicTableSink, SupportsWritingMetada
                                         partitioner,
                                         keySerialization,
                                         valueSerialization,
+                                        keyRecordSerialization,
+                                        valueRecordSerialization,
                                         getFieldGetters(physicalChildren, keyProjection),
                                         getFieldGetters(physicalChildren, valueProjection),
                                         hasMetadata(),
                                         getMetadataPositions(physicalChildren),
-                                        upsertMode))
+                                        upsertMode) {
+                                    @Nullable
+                                    @Override
+                                    public ProducerRecord<byte[], byte[]> serialize(
+                                            RowData element,
+                                            KafkaSinkContext context,
+                                            Long timestamp) {
+                                        return null;
+                                    }
+                                })
                         .build();
         if (flushMode.isEnabled() && upsertMode) {
             return new DataStreamSinkProvider() {
@@ -283,6 +303,8 @@ public class KafkaDynamicSink implements DynamicTableSink, SupportsWritingMetada
                         valueEncodingFormat,
                         keyProjection,
                         valueProjection,
+                        keyRecordSerialization,
+                        valueRecordSerialization,
                         keyPrefix,
                         topics,
                         topicPattern,

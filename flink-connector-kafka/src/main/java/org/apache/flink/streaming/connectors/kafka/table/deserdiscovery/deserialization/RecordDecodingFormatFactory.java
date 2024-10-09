@@ -1,9 +1,25 @@
-package org.apache.flink.streaming.connectors.kafka.table.deserdiscovery.deserialization;
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
+package org.apache.flink.streaming.connectors.kafka.table.deserdiscovery.deserialization;
 
 import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.configuration.ReadableConfig;
-import org.apache.flink.table.connector.format.DecodingFormat;
 import org.apache.flink.table.connector.format.Format;
 import org.apache.flink.table.connector.source.LookupTableSource;
 import org.apache.flink.table.connector.source.ScanTableSource;
@@ -12,8 +28,8 @@ import org.apache.flink.table.factories.FactoryUtil;
 import org.apache.flink.table.factories.FormatFactory;
 
 /**
- * Base interface for configuring a {@link DecodingFormat} for {@link ScanTableSource} and {@link
- * LookupTableSource}.
+ * Base interface for configuring a {@link RecordDecodingFormat} for {@link ScanTableSource} and
+ * {@link LookupTableSource}.
  *
  * <p>Depending on the kind of external system, a connector might support different encodings for
  * reading and writing rows. This interface helps in making such formats pluggable.
@@ -25,7 +41,7 @@ import org.apache.flink.table.factories.FormatFactory;
  * @param <I> runtime interface needed by the table source
  */
 @PublicEvolving
-public interface DecodingRecordFormatFactory<I> extends FormatFactory {
+public interface RecordDecodingFormatFactory<I> extends FormatFactory {
 
     /**
      * Creates a format from the given context and format options.
@@ -33,6 +49,6 @@ public interface DecodingRecordFormatFactory<I> extends FormatFactory {
      * <p>The format options have been projected to top-level options (e.g. from {@code
      * format.ignore-errors} to {@code ignore-errors}).
      */
-    RecordBasedFormatDeserialization<I> createRecordBasedFormatDeserialization(
-            DynamicTableFactory.Context context, ReadableConfig formatOptions);
+    RecordDecodingFormat<I> createRecordDeserializationFormat(
+            DynamicTableFactory.Context context, ReadableConfig formatOptions, boolean isKeyFlag);
 }

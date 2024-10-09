@@ -156,6 +156,10 @@ public class UpsertKafkaDynamicTableFactory
                 new DecodingFormatWrapper(valueDecodingFormat),
                 keyValueProjections.f0,
                 keyValueProjections.f1,
+                // keyRecordDeserialization.orElse(null),
+                // valueRecordDeserialization,
+                null,
+                null,
                 keyPrefix,
                 getTopics(tableOptions),
                 getTopicPattern(tableOptions),
@@ -195,6 +199,7 @@ public class UpsertKafkaDynamicTableFactory
         Tuple2<int[], int[]> keyValueProjections =
                 createKeyValueProjections(context.getCatalogTable());
         final String keyPrefix = tableOptions.getOptional(KEY_FIELDS_PREFIX).orElse(null);
+
         final Properties properties = getKafkaProperties(context.getCatalogTable().getOptions());
 
         Integer parallelism = tableOptions.get(SINK_PARALLELISM);
@@ -213,6 +218,10 @@ public class UpsertKafkaDynamicTableFactory
                 new EncodingFormatWrapper(valueEncodingFormat),
                 keyValueProjections.f0,
                 keyValueProjections.f1,
+                // keyRecordSerialization,
+                // valueRecordSerialization,
+                null,
+                null,
                 keyPrefix,
                 getTopics(tableOptions),
                 getTopicPattern(tableOptions),

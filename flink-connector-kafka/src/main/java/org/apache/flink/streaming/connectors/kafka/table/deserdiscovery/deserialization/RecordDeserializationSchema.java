@@ -19,10 +19,11 @@
 package org.apache.flink.streaming.connectors.kafka.table.deserdiscovery.deserialization;
 
 import org.apache.flink.table.connector.format.Format;
+
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 
 /** Indicates this is record based deserialization. */
-public interface RecordDeserializationFormat<I> extends Format {
+public interface RecordDeserializationSchema<I> extends Format {
     boolean isKeyFlag();
 
     byte[] getBytesForFormat(ConsumerRecord<byte[], byte[]> record);

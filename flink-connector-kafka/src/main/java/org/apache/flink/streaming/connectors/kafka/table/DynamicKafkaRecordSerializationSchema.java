@@ -21,10 +21,7 @@ import org.apache.flink.api.common.serialization.SerializationSchema;
 import org.apache.flink.connector.kafka.sink.KafkaRecordSerializationSchema;
 import org.apache.flink.connector.kafka.sink.KafkaSink;
 import org.apache.flink.streaming.connectors.kafka.partitioner.FlinkKafkaPartitioner;
-import org.apache.flink.streaming.connectors.kafka.table.deserdiscovery.KafkaFactoryUtil;
-import org.apache.flink.streaming.connectors.kafka.table.deserdiscovery.serialization.DefaultRecordBasedSerializationFactory;
-import org.apache.flink.streaming.connectors.kafka.table.deserdiscovery.serialization.RecordBasedSerialization;
-import org.apache.flink.streaming.connectors.kafka.table.deserdiscovery.serialization.RecordBasedSerializationFactory;
+import org.apache.flink.streaming.connectors.kafka.table.deserdiscovery.serialization.RecordBasedFormatSerialization;
 import org.apache.flink.table.data.GenericRowData;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.types.RowKind;
@@ -38,9 +35,9 @@ import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
 
@@ -60,6 +57,8 @@ class DynamicKafkaRecordSerializationSchema implements KafkaRecordSerializationS
     private final int[] metadataPositions;
     private final boolean upsertMode;
     private final Map<String, Boolean> topicPatternMatches;
+    private final Optional<RecordBasedFormatSerialization> keyRecordSerialization;
+    private final RecordBasedFormatSerialization valueRecordSerialization;
 
     DynamicKafkaRecordSerializationSchema(
             @Nullable List<String> topics,
@@ -67,6 +66,8 @@ class DynamicKafkaRecordSerializationSchema implements KafkaRecordSerializationS
             @Nullable FlinkKafkaPartitioner<RowData> partitioner,
             @Nullable SerializationSchema<RowData> keySerialization,
             SerializationSchema<RowData> valueSerialization,
+            @Nullable Optional<RecordBasedFormatSerialization> keyRecordSerialization,
+            RecordBasedFormatSerialization valueRecordSerialization,
             RowData.FieldGetter[] keyFieldGetters,
             RowData.FieldGetter[] valueFieldGetters,
             boolean hasMetadata,
@@ -94,6 +95,8 @@ class DynamicKafkaRecordSerializationSchema implements KafkaRecordSerializationS
         this.valueFieldGetters = valueFieldGetters;
         this.hasMetadata = hasMetadata;
         this.metadataPositions = metadataPositions;
+        this.keyRecordSerialization = keyRecordSerialization;
+        this.valueRecordSerialization = valueRecordSerialization;
         this.upsertMode = upsertMode;
         // Cache results of topic pattern matches to avoid re-evaluating the pattern for each record
         this.topicPatternMatches = new HashMap<>();
@@ -111,20 +114,22 @@ class DynamicKafkaRecordSerializationSchema implements KafkaRecordSerializationS
             // the valueSerialized might have been customized by the format to supply headers.
             // So get the headers and values so the format can digest its customized serialization
             // default to existing behaviour.
-            Iterable<Header> headers = getHeadersForValue(valueSerialized);
-            final byte[] valueSerializedAfterPostProcessing = getSerialization(valueSerialized);
+            //            Iterable<Header> headers = getHeadersForValue(valueSerialized);
+            //            final byte[] valueSerializedAfterPostProcessing =
+            // getSerialization(valueSerialized);
 
-            return new ProducerRecord<>(
-                    targetTopic,
-                    extractPartition(
-                            consumedRow,
-                            targetTopic,
-                            null,
-                            valueSerializedAfterPostProcessing,
-                            context.getPartitionsForTopic(targetTopic)),
-                    (byte[]) null,
-                    valueSerializedAfterPostProcessing,
-                    headers);
+            //            return new ProducerRecord<>(
+            //                    targetTopic,
+            //                    extractPartition(
+            //                            consumedRow,
+            //                            targetTopic,
+            //                            null,
+            //                            valueSerializedAfterPostProcessing,
+            //                            context.getPartitionsForTopic(targetTopic)),
+            //                    (byte[]) null,
+            //                    valueSerializedAfterPostProcessing,
+            //                    headers);
+            return null; // TODO
         }
         final byte[] keySerialized;
         if (keySerialization == null) {
@@ -156,79 +161,64 @@ class DynamicKafkaRecordSerializationSchema implements KafkaRecordSerializationS
         }
         final String targetTopic = getTargetTopic(consumedRow);
 
-        Iterable<Header> valueHeaders = getHeadersForValue(valueSerialized);
-        Iterable<Header> keyHeaders = getHeadersForKey(keySerialized);
-        Iterable<Header> metadataHeaders =
-                readMetadata(consumedRow, KafkaDynamicSink.WritableMetadata.HEADERS);
-        final byte[] valueSerializedAfterPostProcessing = getSerialization(valueSerialized);
-        final byte[] keySerializedAfterPostProcessing = getSerialization(keySerialized);
+        //        Iterable<Header> valueHeaders = getHeadersForValue(valueSerialized);
+        //       Iterable<Header> keyHeaders = getHeadersForKey(keySerialized);
+        //      Iterable<Header> metadataHeaders =
+        readMetadata(consumedRow, KafkaDynamicSink.WritableMetadata.HEADERS);
+        //        final byte[] valueSerializedAfterPostProcessing =
+        // getSerialization(valueSerialized);
+        //        final byte[] keySerializedAfterPostProcessing = getSerialization(keySerialized);
         List<Header> combinedHeaders = new ArrayList<>();
 
-        if (metadataHeaders != null) {
-            Iterator<Header> headersIter = metadataHeaders.iterator();
-            if (headersIter != null) {
-                while (headersIter.hasNext()) {
-                    combinedHeaders.add(headersIter.next());
-                }
-            }
-        }
+        // if (metadataHeaders != null) {
+        //            Iterator<Header> headersIter = metadataHeaders.iterator();
+        //            if (headersIter != null) {
+        //                while (headersIter.hasNext()) {
+        //                    combinedHeaders.add(headersIter.next());
+        //                }
+        //            }
+        //        }
 
-        if (valueHeaders != null) {
-            Iterator<Header> headersIter = valueHeaders.iterator();
-            if (headersIter != null) {
-                while (headersIter.hasNext()) {
-                    combinedHeaders.add(headersIter.next());
-                }
-            }
-        }
-        if (keyHeaders != null) {
-            Iterator<Header> headersIter = keyHeaders.iterator();
-            if (headersIter != null) {
-                while (headersIter.hasNext()) {
-                    combinedHeaders.add(headersIter.next());
-                }
-            }
-        }
-
+        //        if (valueHeaders != null) {
+        //            Iterator<Header> headersIter = valueHeaders.iterator();
+        //            if (headersIter != null) {
+        //                while (headersIter.hasNext()) {
+        //                    combinedHeaders.add(headersIter.next());
+        //                }
+        //            }
+        //        }
+        //        if (keyHeaders != null) {
+        //            Iterator<Header> headersIter = keyHeaders.iterator();
+        //            if (headersIter != null) {
+        //                while (headersIter.hasNext()) {
+        //                    combinedHeaders.add(headersIter.next());
+        //                }
+        //            }
+        //        }
+        //        eturn new ProducerRecord<>(
+        //                targetTopic,
+        //                extractPartition(
+        //                        consumedRow,
+        //                        targetTopic,
+        //                        keySerializedAfterPostProcessing,
+        //                        valueSerializedAfterPostProcessing,
+        //                        context.getPartitionsForTopic(targetTopic)),
+        //                readMetadata(consumedRow, KafkaDynamicSink.WritableMetadata.TIMESTAMP),
+        //                keySerializedAfterPostProcessing,
+        //                valueSerializedAfterPostProcessing,
+        //                combinedHeaders);
         return new ProducerRecord<>(
                 targetTopic,
                 extractPartition(
                         consumedRow,
                         targetTopic,
-                        keySerializedAfterPostProcessing,
-                        valueSerializedAfterPostProcessing,
+                        null,
+                        null,
                         context.getPartitionsForTopic(targetTopic)),
                 readMetadata(consumedRow, KafkaDynamicSink.WritableMetadata.TIMESTAMP),
-                keySerializedAfterPostProcessing,
-                valueSerializedAfterPostProcessing,
+                null,
+                null,
                 combinedHeaders);
-    }
-
-    private byte[] getSerialization(byte[] customSerialization) {
-        RecordBasedSerialization recordBasedSerialization =
-                getRecordBasedSerializationFactory(customSerialization);
-        return recordBasedSerialization.getPayload(customSerialization);
-    }
-
-    private Iterable<Header> getHeadersForKey(byte[] customSerialization) {
-        RecordBasedSerialization recordBasedSerialization =
-                getRecordBasedSerializationFactory(customSerialization);
-        return recordBasedSerialization.getKeyHeaders(customSerialization);
-    }
-
-    private Iterable<Header> getHeadersForValue(byte[] customSerialization) {
-        RecordBasedSerialization recordBasedSerialization =
-                getRecordBasedSerializationFactory(customSerialization);
-        return recordBasedSerialization.getValueHeaders(customSerialization);
-    }
-
-    private RecordBasedSerialization getRecordBasedSerializationFactory(
-            byte[] customSerialization) {
-        return KafkaFactoryUtil.loadAndInvokeFactoryWithCustomSerialization(
-                RecordBasedSerializationFactory.class,
-                RecordBasedSerializationFactory::create,
-                DefaultRecordBasedSerializationFactory::new,
-                customSerialization);
     }
 
     @Override

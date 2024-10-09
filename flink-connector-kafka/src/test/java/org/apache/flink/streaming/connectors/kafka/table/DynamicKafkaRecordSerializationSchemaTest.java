@@ -111,6 +111,8 @@ public class DynamicKafkaRecordSerializationSchemaTest extends TestLogger {
                 null,
                 null,
                 serializationSchema,
+                null,
+                null,
                 new RowData.FieldGetter[] {r -> r.getString(0)},
                 new RowData.FieldGetter[] {r -> r.getString(0)},
                 true,

@@ -36,6 +36,8 @@ import org.apache.flink.streaming.connectors.kafka.config.BoundedMode;
 import org.apache.flink.streaming.connectors.kafka.config.StartupMode;
 import org.apache.flink.streaming.connectors.kafka.internals.KafkaTopicPartition;
 import org.apache.flink.streaming.connectors.kafka.table.DynamicKafkaDeserializationSchema.MetadataConverter;
+import org.apache.flink.streaming.connectors.kafka.table.deserdiscovery.deserialization.RecordDecodingFormat;
+import org.apache.flink.streaming.connectors.kafka.table.deserdiscovery.deserialization.RecordDeserializationSchema;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.connector.ChangelogMode;
 import org.apache.flink.table.connector.Projection;
@@ -118,6 +120,11 @@ public class KafkaDynamicSource
     /** Indices that determine the value fields and the target position in the produced row. */
     protected final int[] valueProjection;
 
+    protected @Nullable final RecordDecodingFormat<RecordDeserializationSchema>
+            keyRecordDecodingFormat;
+
+    protected final RecordDecodingFormat<RecordDeserializationSchema> valueRecordDecodingFormat;
+
     /** Prefix that needs to be removed from fields when constructing the physical data type. */
     protected final @Nullable String keyPrefix;
 
@@ -177,6 +184,8 @@ public class KafkaDynamicSource
             DecodingFormat<DeserializationSchema<RowData>> valueDecodingFormat,
             int[] keyProjection,
             int[] valueProjection,
+            @Nullable RecordDecodingFormat<RecordDeserializationSchema> keyRecordDecodingFormat,
+            RecordDecodingFormat<RecordDeserializationSchema> valueRecordDecodingFormat,
             @Nullable String keyPrefix,
             @Nullable List<String> topics,
             @Nullable Pattern topicPattern,
@@ -201,6 +210,8 @@ public class KafkaDynamicSource
                 Preconditions.checkNotNull(keyProjection, "Key projection must not be null.");
         this.valueProjection =
                 Preconditions.checkNotNull(valueProjection, "Value projection must not be null.");
+        this.keyRecordDecodingFormat = keyRecordDecodingFormat;
+        this.valueRecordDecodingFormat = valueRecordDecodingFormat;
         this.keyPrefix = keyPrefix;
         // Mutable attributes
         this.producedDataType = physicalDataType;
@@ -243,11 +254,24 @@ public class KafkaDynamicSource
         final DeserializationSchema<RowData> valueDeserialization =
                 createDeserialization(context, valueDecodingFormat, valueProjection, null);
 
+        final RecordDeserializationSchema keyRecordDeserialization =
+                createRecordDeserialization(
+                        context, keyRecordDecodingFormat, keyProjection, keyPrefix, true);
+
+        final RecordDeserializationSchema valueRecordDeserialization =
+                createRecordDeserialization(
+                        context, valueRecordDecodingFormat, valueProjection, null, false);
+
         final TypeInformation<RowData> producedTypeInfo =
                 context.createTypeInformation(producedDataType);
 
         final KafkaSource<RowData> kafkaSource =
-                createKafkaSource(keyDeserialization, valueDeserialization, producedTypeInfo);
+                createKafkaSource(
+                        keyDeserialization,
+                        valueDeserialization,
+                        keyRecordDeserialization,
+                        valueRecordDeserialization,
+                        producedTypeInfo);
 
         return new DataStreamScanProvider() {
             @Override
@@ -333,6 +357,8 @@ public class KafkaDynamicSource
                         valueDecodingFormat,
                         keyProjection,
                         valueProjection,
+                        keyRecordDecodingFormat,
+                        valueRecordDecodingFormat,
                         keyPrefix,
                         topics,
                         topicPattern,
@@ -417,11 +443,17 @@ public class KafkaDynamicSource
     protected KafkaSource<RowData> createKafkaSource(
             DeserializationSchema<RowData> keyDeserialization,
             DeserializationSchema<RowData> valueDeserialization,
+            RecordDeserializationSchema keyRecordDeserialization,
+            RecordDeserializationSchema valueRecordDeserialization,
             TypeInformation<RowData> producedTypeInfo) {
 
         final KafkaDeserializationSchema<RowData> kafkaDeserializer =
                 createKafkaDeserializationSchema(
-                        keyDeserialization, valueDeserialization, producedTypeInfo);
+                        keyDeserialization,
+                        valueDeserialization,
+                        keyRecordDeserialization,
+                        valueRecordDeserialization,
+                        producedTypeInfo);
 
         final KafkaSourceBuilder<RowData> kafkaSourceBuilder = KafkaSource.builder();
 
@@ -513,6 +545,8 @@ public class KafkaDynamicSource
     private KafkaDeserializationSchema<RowData> createKafkaDeserializationSchema(
             DeserializationSchema<RowData> keyDeserialization,
             DeserializationSchema<RowData> valueDeserialization,
+            RecordDeserializationSchema keyRecordDeserialization,
+            RecordDeserializationSchema valueRecordDeserialization,
             TypeInformation<RowData> producedTypeInfo) {
         final MetadataConverter[] metadataConverters =
                 metadataKeys.stream()
@@ -546,6 +580,8 @@ public class KafkaDynamicSource
                 keyDeserialization,
                 keyProjection,
                 valueDeserialization,
+                keyRecordDeserialization,
+                valueRecordDeserialization,
                 adjustedValueProjection,
                 hasMetadata,
                 metadataConverters,
@@ -566,6 +602,23 @@ public class KafkaDynamicSource
             physicalFormatDataType = DataTypeUtils.stripRowPrefix(physicalFormatDataType, prefix);
         }
         return format.createRuntimeDecoder(context, physicalFormatDataType);
+    }
+
+    private @Nullable RecordDeserializationSchema createRecordDeserialization(
+            DynamicTableSource.Context context,
+            @Nullable RecordDecodingFormat<RecordDeserializationSchema> format,
+            int[] projection,
+            @Nullable String prefix,
+            boolean isKeyflag) {
+        if (format == null) {
+            return null;
+        }
+        DataType physicalFormatDataType = Projection.of(projection).project(this.physicalDataType);
+        if (prefix != null) {
+            physicalFormatDataType = DataTypeUtils.stripRowPrefix(physicalFormatDataType, prefix);
+        }
+        // TODO isKey
+        return format.createRuntimeRecordDecoder(context, physicalFormatDataType, isKeyflag);
     }
 
     // --------------------------------------------------------------------------------------------

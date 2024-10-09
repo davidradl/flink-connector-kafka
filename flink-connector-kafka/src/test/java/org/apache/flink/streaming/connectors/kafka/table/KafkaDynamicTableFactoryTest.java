@@ -1256,6 +1256,8 @@ public class KafkaDynamicTableFactoryTest {
                 valueDecodingFormat,
                 keyProjection,
                 valueProjection,
+                null, // TODO
+                null, // TODO
                 keyPrefix,
                 topics,
                 topicPattern,
@@ -1276,7 +1278,7 @@ public class KafkaDynamicTableFactoryTest {
             EncodingFormat<SerializationSchema<RowData>> valueEncodingFormat,
             int[] keyProjection,
             int[] valueProjection,
-            @Nullable String keyPrefix,
+            String keyPrefix,
             @Nullable List<String> topics,
             @Nullable Pattern topicPattern,
             Properties properties,
@@ -1291,6 +1293,8 @@ public class KafkaDynamicTableFactoryTest {
                 valueEncodingFormat,
                 keyProjection,
                 valueProjection,
+                null,
+                null,
                 keyPrefix,
                 topics,
                 topicPattern,

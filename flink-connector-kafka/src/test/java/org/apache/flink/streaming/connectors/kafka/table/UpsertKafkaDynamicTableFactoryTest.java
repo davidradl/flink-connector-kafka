@@ -858,6 +858,8 @@ public class UpsertKafkaDynamicTableFactoryTest extends TestLogger {
                 new UpsertKafkaDynamicTableFactory.DecodingFormatWrapper(valueDecodingFormat),
                 keyFields,
                 valueFields,
+                null, // TODO
+                null, // TODO
                 keyPrefix,
                 topic,
                 null,
@@ -893,6 +895,8 @@ public class UpsertKafkaDynamicTableFactoryTest extends TestLogger {
                 new UpsertKafkaDynamicTableFactory.EncodingFormatWrapper(valueEncodingFormat),
                 keyProjection,
                 valueProjection,
+                null, // TODO
+                null, // TODO
                 keyPrefix,
                 topics,
                 topicPattern,

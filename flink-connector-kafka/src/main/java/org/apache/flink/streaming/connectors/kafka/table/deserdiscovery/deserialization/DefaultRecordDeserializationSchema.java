@@ -19,14 +19,15 @@
 package org.apache.flink.streaming.connectors.kafka.table.deserdiscovery.deserialization;
 
 import org.apache.flink.table.connector.ChangelogMode;
+
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 
 /** Indicates this is record based deserialization. */
-public class DefaultRecordDeserializationFormat implements RecordDeserializationFormat {
+public class DefaultRecordDeserializationSchema implements RecordDeserializationSchema {
 
     private final boolean isKeyFlag;
 
-    DefaultRecordDeserializationFormat(boolean isKeyFlag) {
+    DefaultRecordDeserializationSchema(boolean isKeyFlag) {
         this.isKeyFlag = isKeyFlag;
     }
 

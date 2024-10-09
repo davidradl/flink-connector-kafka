@@ -32,6 +32,11 @@ import org.apache.flink.streaming.connectors.kafka.config.StartupMode;
 import org.apache.flink.streaming.connectors.kafka.internals.KafkaTopicPartition;
 import org.apache.flink.streaming.connectors.kafka.partitioner.FlinkKafkaPartitioner;
 import org.apache.flink.streaming.connectors.kafka.table.KafkaConnectorOptionsUtil.BoundedOptions;
+import org.apache.flink.streaming.connectors.kafka.table.deserdiscovery.deserialization.RecordDecodingFormat;
+import org.apache.flink.streaming.connectors.kafka.table.deserdiscovery.deserialization.RecordDecodingFormatFactory;
+import org.apache.flink.streaming.connectors.kafka.table.deserdiscovery.deserialization.RecordDeserializationFormatFactory;
+import org.apache.flink.streaming.connectors.kafka.table.deserdiscovery.deserialization.RecordDeserializationSchema;
+import org.apache.flink.streaming.connectors.kafka.table.deserdiscovery.serialization.RecordBasedFormatSerialization;
 import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.catalog.ObjectIdentifier;
 import org.apache.flink.table.connector.format.DecodingFormat;
@@ -174,6 +179,7 @@ public class KafkaDynamicTableFactory
 
     @Override
     public DynamicTableSource createDynamicTableSource(Context context) {
+
         final TableFactoryHelper helper = FactoryUtil.createTableFactoryHelper(this, context);
 
         final Optional<DecodingFormat<DeserializationSchema<RowData>>> keyDecodingFormat =
@@ -181,6 +187,15 @@ public class KafkaDynamicTableFactory
 
         final DecodingFormat<DeserializationSchema<RowData>> valueDecodingFormat =
                 getValueDecodingFormat(helper);
+        // new
+        final KafkaFactoryUtil.KafkaTableFactoryHelper kafkaHelper =
+                KafkaFactoryUtil.createKafkaTableFactoryHelper(this, context);
+
+        final Optional<RecordDecodingFormat<RecordDeserializationSchema>> keyRecordDecodingFormat =
+                getKeyRecordDecodingFormat(kafkaHelper);
+
+        final RecordDecodingFormat<RecordDeserializationSchema> valueRecordDecodingFormat =
+                getValueRecordDecodingFormat(kafkaHelper);
 
         helper.validateExcept(PROPERTIES_PREFIX);
 
@@ -221,6 +236,8 @@ public class KafkaDynamicTableFactory
                 valueDecodingFormat,
                 keyProjection,
                 valueProjection,
+                keyRecordDecodingFormat.orElse(null),
+                valueRecordDecodingFormat,
                 keyPrefix,
                 getTopics(tableOptions),
                 getTopicPattern(tableOptions),
@@ -234,6 +251,47 @@ public class KafkaDynamicTableFactory
                 context.getObjectIdentifier().asSummaryString());
     }
 
+    private Optional<RecordDecodingFormat<RecordDeserializationSchema>> getKeyRecordDecodingFormat(
+            KafkaFactoryUtil.KafkaTableFactoryHelper helper) {
+
+        final Optional<RecordDecodingFormat<RecordDeserializationSchema>> keyRecordDecodingFormat =
+                helper.discoverOptionalRecordDecodingFormat(
+                        RecordDecodingFormatFactory.class, KEY_FORMAT, true);
+        keyRecordDecodingFormat.ifPresent(
+                format -> {
+                    if (!format.getChangelogMode().containsOnly(RowKind.INSERT)) {
+                        throw new ValidationException(
+                                String.format(
+                                        "A key format should only deal with INSERT-only records. "
+                                                + "But %s has a changelog mode of %s.",
+                                        helper.getOptions().get(KEY_FORMAT),
+                                        format.getChangelogMode()));
+                    }
+                });
+        return keyRecordDecodingFormat;
+    }
+    /*
+    private static DecodingFormat<DeserializationSchema<RowData>> getValueDecodingFormat(
+            TableFactoryHelper helper) {
+        return helper.discoverOptionalDecodingFormat(
+                        DeserializationFormatFactory.class, FactoryUtil.FORMAT)
+                .orElseGet(
+                        () ->
+                                helper.discoverDecodingFormat(
+                                        DeserializationFormatFactory.class, VALUE_FORMAT));
+    }
+    */
+
+    private RecordDecodingFormat<RecordDeserializationSchema> getValueRecordDecodingFormat(
+            KafkaFactoryUtil.KafkaTableFactoryHelper helper) {
+        return helper.discoverOptionalRecordDecodingFormat(
+                        RecordDeserializationFormatFactory.class, FactoryUtil.FORMAT, false)
+                .orElseGet(
+                        () ->
+                                helper.discoverRecordDecodingFormat(
+                                        RecordDecodingFormatFactory.class, VALUE_FORMAT, false));
+    }
+
     @Override
     public DynamicTableSink createDynamicTableSink(Context context) {
         final TableFactoryHelper helper =
@@ -245,6 +303,16 @@ public class KafkaDynamicTableFactory
 
         final EncodingFormat<SerializationSchema<RowData>> valueEncodingFormat =
                 getValueEncodingFormat(helper);
+
+        // new
+        final KafkaFactoryUtil.KafkaTableFactoryHelper kafkaHelper =
+                KafkaFactoryUtil.createKafkaTableFactoryHelper(this, context);
+
+        final Optional<RecordDeserializationSchema> keyRecordDeserialization =
+                getKeyRecordDeserialization(kafkaHelper);
+
+        final RecordDeserializationSchema valueRecordDeserializer =
+                getValueRecordDeserialization(kafkaHelper);
 
         helper.validateExcept(PROPERTIES_PREFIX);
 
@@ -277,6 +345,11 @@ public class KafkaDynamicTableFactory
                 valueEncodingFormat,
                 keyProjection,
                 valueProjection,
+                // TODO encoding versions
+                null,
+                null,
+                //                keyRecord,
+                //                valueRecordSerializer,
                 keyPrefix,
                 getTopics(tableOptions),
                 getTopicPattern(tableOptions),
@@ -325,6 +398,17 @@ public class KafkaDynamicTableFactory
                 });
         return keyEncodingFormat;
     }
+    /*
+    private static DecodingFormat<DeserializationSchema<RowData>> getValueDecodingFormat(
+            TableFactoryHelper helper) {
+        return helper.discoverOptionalDecodingFormat(
+                        DeserializationFormatFactory.class, FactoryUtil.FORMAT)
+                .orElseGet(
+                        () ->
+                                helper.discoverDecodingFormat(
+                                        DeserializationFormatFactory.class, VALUE_FORMAT));
+    }
+     */
 
     private static DecodingFormat<DeserializationSchema<RowData>> getValueDecodingFormat(
             TableFactoryHelper helper) {
@@ -344,6 +428,24 @@ public class KafkaDynamicTableFactory
                         () ->
                                 helper.discoverEncodingFormat(
                                         SerializationFormatFactory.class, VALUE_FORMAT));
+    }
+
+    private Optional<RecordDeserializationSchema> getKeyRecordDeserialization(
+            KafkaFactoryUtil.KafkaTableFactoryHelper helper) {
+        return null;
+    }
+
+    private RecordDeserializationSchema getValueRecordDeserialization(
+            KafkaFactoryUtil.KafkaTableFactoryHelper helper) {
+
+        return helper.discoverOptionalRecordDecodingFormat(
+                        RecordDeserializationFormatFactory.class, FactoryUtil.FORMAT, false)
+                .orElseGet(
+                        () ->
+                                helper.discoverRecordDecodingFormat(
+                                        RecordDeserializationFormatFactory.class,
+                                        VALUE_FORMAT,
+                                        false));
     }
 
     private static void validatePKConstraints(
@@ -386,6 +488,8 @@ public class KafkaDynamicTableFactory
             DecodingFormat<DeserializationSchema<RowData>> valueDecodingFormat,
             int[] keyProjection,
             int[] valueProjection,
+            @Nullable RecordDecodingFormat<RecordDeserializationSchema> keyRecordDecodingformat,
+            RecordDecodingFormat<RecordDeserializationSchema> valueRecordDecodingFormat,
             @Nullable String keyPrefix,
             @Nullable List<String> topics,
             @Nullable Pattern topicPattern,
@@ -403,6 +507,8 @@ public class KafkaDynamicTableFactory
                 valueDecodingFormat,
                 keyProjection,
                 valueProjection,
+                keyRecordDecodingformat,
+                valueRecordDecodingFormat,
                 keyPrefix,
                 topics,
                 topicPattern,
@@ -423,6 +529,8 @@ public class KafkaDynamicTableFactory
             EncodingFormat<SerializationSchema<RowData>> valueEncodingFormat,
             int[] keyProjection,
             int[] valueProjection,
+            @Nullable Optional<RecordBasedFormatSerialization> keyRecordSerialization,
+            RecordBasedFormatSerialization valueRecordSerialization,
             @Nullable String keyPrefix,
             @Nullable List<String> topics,
             @Nullable Pattern topicPattern,
@@ -438,6 +546,8 @@ public class KafkaDynamicTableFactory
                 valueEncodingFormat,
                 keyProjection,
                 valueProjection,
+                keyRecordSerialization,
+                valueRecordSerialization,
                 keyPrefix,
                 topics,
                 topicPattern,
